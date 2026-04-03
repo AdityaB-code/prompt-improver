@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+
+	<head>
+		<meta charset="UTF-8">
+		<meta name="viewport" content="width=device-width, initial-scale=1.0">
+		<meta name="theme-color" content="#0b1220">
+		<title>Cyrus AI - Chat</title>
+
+		<link rel="stylesheet" href="{{ url_for('static', filename='ChatStyles.css') }}">
+	</head>
+
+	<body>
+		<div class="app-bg">
+			<div class="bg-orb bg-orb-1"></div>
+			<div class="bg-orb bg-orb-2"></div>
+			<div class="bg-grid"></div>
+		</div>
+
+		<div class="chat-app">
+			<aside class="sidebar glass-panel">
+				<div class="sidebar-brand">
+					<img src="{{ url_for('static', filename='images/male0073.png') }}" class="chat-image" alt="img">
+					<div class="brand-copy">
+						<h1>Cyrus AI</h1>
+						<p>Prompt Improvement Studio</p>
+					</div>
+				</div>
+
+				<div class="sidebar-section">
+					<div class="section-label">Workspace</div>
+					<a class="sidebar-item active" href="/chat">
+						<span class="item-icon">💬</span>
+						<span>Chat</span>
+					</a>
+					<!-- <a class="sidebar-item" href="/history"> -->
+					<!-- 	<span class="item-icon">🕘</span> -->
+					<!-- 	<span>History</span> -->
+					<!-- </a> -->
+				</div>
+
+				<div class="sidebar-section">
+					<div class="section-label">Quick Prompts</div>
+					<button class="prompt-chip" type="button">Make this prompt clearer</button>
+					<button class="prompt-chip" type="button">Add missing context</button>
+					<button class="prompt-chip" type="button">Turn into a structured prompt</button>
+				</div>
+
+				<div class="sidebar-section sidebar-history">
+					<div class="section-label">Recent Sessions</div>
+					<div id="history-list" class="history-list">
+						<div class="history-empty">
+							No history loaded yet.
+						</div>
+					</div>
+				</div>
+
+				<div class="sidebar-footer">
+					<div class="status-pill">
+						<span class="status-dot"></span>
+						<span>Connected</span>
+					</div>
+					<p class="sidebar-note">Glass UI concept for a modern prompt workflow.</p>
+				</div>
+			</aside>
+
+			<main class="main-shell">
+				<header class="topbar glass-panel">
+					<div class="topbar-left">
+						<div class="mobile-brand">
+						</div>
+						<div>
+							<h2>Chat</h2>
+							<p>Refine raw ideas into structured, high-quality prompts.</p>
+						</div>
+					</div>
+
+					<div class="topbar-right">
+						<div class="topbar-badge">
+							<h3>Cyrus AI - Prompt in Style</h3>
+						</div>
+					</div>
+				</header>
+
+				<section class="chat-stage glass-panel">
+					<div class="chat-stage-header">
+						<div>
+							<h3>Prompt Improvement Flow</h3>
+							<p>Start with a rough prompt. Cyrus AI will help expand, question, and refine it.</p>
+						</div>
+					</div>
+
+					<div id="chat-container" class="chat-container" aria-live="polite" aria-relevant="additions text">
+						<div class="empty-state">
+							<div class="empty-icon">🤖</div>
+							<h4>Ready when you are</h4>
+							<p>
+								Enter a rough prompt below. The assistant will analyze it, ask the missing questions,
+								and then generate a polished final version.
+							</p>
+						</div>
+					</div>
+
+					<div class="composer-wrap">
+						<div class="composer glass-input">
+							<textarea id="chat-input" name="chat-input" placeholder="Enter your prompt..." rows="1" autocomplete="off" spellcheck="false"></textarea>
+
+							<div class="composer-actions">
+								<button id="send-btn" class="send-btn" type="button">
+									<span>Send</span>
+									<span class="send-arrow">➤</span>
+								</button>
+							</div>
+						</div>
+
+						<p class="composer-hint">
+							Press Enter to send, Shift + Enter for a new line.
+						</p>
+					</div>
+				</section>
+			</main>
+		</div>
+
+		<script src="{{ url_for('static', filename='ChatScript.js') }}"></script>
+	</body>
+</html>

@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+
+	<head>
+		<meta charset="UTF-8">
+		<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+		<!-- Remix Icons -->
+		<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/remixicon/4.6.0/remixicon.min.css">
+
+		<!-- CSS -->
+		<link rel="stylesheet" href="/static/LoginStyles.css">
+
+		<title>Cyrus AI Login</title>
+
+		<link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='src/assets/male0274.png') }}">
+	</head>
+
+	<body>
+		<section class="login">
+			<div class="login__content">
+
+				<!-- Login Form -->
+				<div>
+					<h2 class="login__title">Welcome back 👋</h2>
+
+					<form action="/chat" method="get" class="login__form">
+
+						<div class="login__group">
+
+							<div class="login__box">
+								<i class="ri-mail-fill login__icon"></i>
+								<input type="email" name="email" autocomplete="email" required placeholder=" " class="login__input" id="email">
+								<label for="email" class="login__label">Email</label>
+							</div>
+
+							<div class="login__box">
+								<i class="ri-lock-2-fill login__icon"></i>
+								<input type="password" name="password" autocomplete="current-password" required placeholder=" " class="login__input" id="password">
+								<label for="password" class="login__label">Password</label>
+							</div>
+						</div>
+
+						<a href="/auth/google" class="login__forgot">Forgot Password?</a>
+
+						<!-- normal login -->
+						<button type="button" class="login__button" onclick="window.location.href='/auth/google'">
+							Log In <i class="ri-send-plane-2-fill"></i>
+						</button>
+
+						<!-- Google Login -->
+						<a href="/auth/google" class="login__button google-login" style="margin-top:10px; display:flex; align-items:center; justify-content:center; gap:8px; padding:12px 0;">
+							<i class="ri-google-fill"></i>
+							<span>Sign up with Google</span>
+						</a>
+
+						<p class="login__sign">
+							Don't have an account? <a href="/auth/google">Sign Up</a>
+						</p>
+					</form>
+				</div>
+
+				<!-- Image -->
+				<div class="login__image">
+					<img src="/static/images/login.png" alt="Login Image" class="login__img">
+				</div>
+			</div>
+		</section>
+
+		<!-- GSAP -->
+		<script src="https://cdn.jsdelivr.net/npm/gsap@3.14.1/dist/gsap.min.js"></script>
+
+		<!-- JS -->
+		<script src="/static/LoginScript.js"></script>
+	</body>
+</html>

@@ -1,0 +1,6 @@
+Flask
+python-dotenv
+pymongo
+authlib
+azure-ai-inference
+azure-core

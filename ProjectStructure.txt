@@ -1,0 +1,17 @@
+.
+├── app.py
+├── pyrightconfig.json
+├── static
+        Images
+        src
+│   ├── ChatScript.js
+│   ├── ChatStyles.css
+│   ├── LoginScript.js
+│   ├── LoginStyles.css
+│   ├── script.js
+│   └── style.css
+└── templates
+    ├── chat.html
+    ├── index.html
+    └── login.html
+    venv
