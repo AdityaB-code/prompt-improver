@@ -1,208 +1,325 @@
-/* =========================
-   ELEMENTS
-========================= */
-const chatContainer = document.getElementById("chat-container");
-const input = document.getElementById("chat-input");
-const sendBtn = document.getElementById("send-btn");
-const historyList = document.getElementById("history-list");
+/* ChatScript.js
+   Frontend-only behavior for the prompt improvement flow:
+   /analyze_prompt -> /submit_answers -> /generate_final
+*/
 
-/* =========================
-   STATE
-========================= */
-let currentStage = "initial"; 
-// initial → questions → waiting_answers → final
+(() => {
+	"use strict";
 
-let storedQuestions = "";
+	const chatContainer = document.getElementById("chat-container");
+	const input = document.getElementById("chat-input");
+	const sendBtn = document.getElementById("send-btn");
+	const historyList = document.getElementById("history-list");
+	const quickPromptButtons = document.querySelectorAll(".prompt-chip");
 
-/* =========================
-   UTILITIES
-========================= */
-function scrollToBottom() {
-	chatContainer.scrollTop = chatContainer.scrollHeight;
-}
-
-function createMessage(content, type = "bot") {
-	const msg = document.createElement("div");
-	msg.classList.add("message", type);
-	msg.innerText = content;
-	chatContainer.appendChild(msg);
-	scrollToBottom();
-}
-
-function showTyping() {
-	const typing = document.createElement("div");
-	typing.classList.add("message", "bot");
-	typing.id = "typing-indicator";
-	typing.innerText = "Typing...";
-	chatContainer.appendChild(typing);
-	scrollToBottom();
-}
-
-function removeTyping() {
-	const typing = document.getElementById("typing-indicator");
-	if (typing) typing.remove();
-}
-
-/* =========================
-   AUTO RESIZE TEXTAREA
-========================= */
-input.addEventListener("input", () => {
-	input.style.height = "auto";
-	input.style.height = input.scrollHeight + "px";
-});
-
-/* =========================
-   SEND HANDLER
-========================= */
-async function handleSend() {
-	const text = input.value.trim();
-	if (!text) return;
-
-	createMessage(text, "user");
-	input.value = "";
-	input.style.height = "auto";
-
-	if (currentStage === "initial") {
-		await analyzePrompt(text);
-	} else if (currentStage === "waiting_answers") {
-		await submitAnswers(text);
+	if (!chatContainer || !input || !sendBtn) {
+		console.error("Chat UI elements not found.");
+		return;
 	}
-}
 
-/* =========================
-   ENTER KEY SUPPORT
-========================= */
-input.addEventListener("keydown", (e) => {
-	if (e.key === "Enter" && !e.shiftKey) {
-		e.preventDefault();
-		handleSend();
+	let stage = "initial"; // initial -> waiting_answers -> final_ready
+	let isBusy = false;
+	let typingEl = null;
+
+	function escapeHtml(str) {
+		return String(str)
+			.replaceAll("&", "&amp;")
+			.replaceAll("<", "&lt;")
+			.replaceAll(">", "&gt;")
+			.replaceAll('"', "&quot;")
+			.replaceAll("'", "&#039;");
 	}
-});
 
-sendBtn.addEventListener("click", handleSend);
+	function scrollToBottom(smooth = true) {
+		chatContainer.scrollTo({
+			top: chatContainer.scrollHeight,
+			behavior: smooth ? "smooth" : "auto",
+		});
+	}
 
-/* =========================
-   API CALLS
-========================= */
+	function setBusy(value) {
+		isBusy = value;
+		sendBtn.disabled = value;
+		input.disabled = false; // keep textarea usable for edits
+		sendBtn.style.opacity = value ? "0.75" : "1";
+		sendBtn.style.cursor = value ? "wait" : "pointer";
+	}
 
-async function analyzePrompt(prompt) {
-	showTyping();
+	function createMessage(content, role = "bot") {
+		const wrapper = document.createElement("div");
+		wrapper.className = `message ${role}`;
+		wrapper.innerHTML = escapeHtml(content).replace(/\n/g, "<br>");
 
-	try {
-		const res = await fetch("/analyze_prompt", {
+		// Force a nicer entrance animation
+		wrapper.style.opacity = "0";
+		wrapper.style.transform = "translateY(10px) scale(0.99)";
+		chatContainer.appendChild(wrapper);
+
+		requestAnimationFrame(() => {
+			wrapper.style.transition = "opacity 220ms ease, transform 220ms ease";
+			wrapper.style.opacity = "1";
+			wrapper.style.transform = "translateY(0) scale(1)";
+		});
+
+		scrollToBottom(true);
+		return wrapper;
+	}
+
+	function showTyping() {
+		removeTyping();
+
+		typingEl = document.createElement("div");
+		typingEl.className = "message bot";
+		typingEl.id = "typing-indicator";
+		typingEl.textContent = "Thinking";
+
+		chatContainer.appendChild(typingEl);
+		scrollToBottom(true);
+	}
+
+	function removeTyping() {
+		if (typingEl && typingEl.parentNode) {
+			typingEl.parentNode.removeChild(typingEl);
+		}
+		typingEl = null;
+	}
+
+	function clearEmptyStateIfNeeded() {
+		const emptyState = chatContainer.querySelector(".empty-state");
+		if (emptyState) emptyState.remove();
+	}
+
+	function autoResizeTextarea() {
+		input.style.height = "auto";
+		input.style.height = Math.min(input.scrollHeight, 170) + "px";
+	}
+
+	function setInputValue(text) {
+		input.value = text;
+		autoResizeTextarea();
+		input.focus();
+	}
+
+	async function apiJson(url, payload) {
+		const res = await fetch(url, {
 			method: "POST",
-			headers: { "Content-Type": "application/json" },
-			body: JSON.stringify({ prompt })
+			headers: {
+				"Content-Type": "application/json",
+			},
+			body: JSON.stringify(payload ?? {}),
 		});
 
-		const data = await res.json();
-		removeTyping();
-
-		if (data.error) {
-			createMessage("Error: " + data.error);
-			return;
+		let data = {};
+		try {
+			data = await res.json();
+		} catch {
+			// ignore parse errors and fall through
 		}
 
-		storedQuestions = data.questions;
-
-		createMessage("I need a bit more information to improve your prompt:\n\n" + data.questions);
-
-		currentStage = "waiting_answers";
-
-	} catch (err) {
-		removeTyping();
-		createMessage("Something went wrong.");
-		console.error(err);
-	}
-}
-
-async function submitAnswers(answers) {
-	showTyping();
-
-	try {
-		await fetch("/submit_answers", {
-			method: "POST",
-			headers: { "Content-Type": "application/json" },
-			body: JSON.stringify({ answers })
-		});
-
-		removeTyping();
-
-		createMessage("Generating your optimized prompt...");
-
-		await generateFinal();
-
-	} catch (err) {
-		removeTyping();
-		createMessage("Error submitting answers.");
-		console.error(err);
-	}
-}
-
-async function generateFinal() {
-	showTyping();
-
-	try {
-		const res = await fetch("/generate_final", {
-			method: "POST"
-		});
-
-		const data = await res.json();
-		removeTyping();
-
-		if (data.error) {
-			createMessage("Error: " + data.error);
-			return;
+		if (!res.ok) {
+			const message = data?.error || `Request failed (${res.status})`;
+			throw new Error(message);
 		}
 
-		createMessage("Here is your optimized prompt:\n\n" + data.final_prompt);
-
-		currentStage = "initial";
-
-	} catch (err) {
-		removeTyping();
-		createMessage("Failed to generate final prompt.");
-		console.error(err);
+		return data;
 	}
-}
 
-/* =========================
-   LOAD HISTORY
-========================= */
-async function loadHistory() {
-	try {
-		const res = await fetch("/history");
-		const data = await res.json();
+	async function analyzePrompt(prompt) {
+		showTyping();
 
-		historyList.innerHTML = "";
+		try {
+			const data = await apiJson("/analyze_prompt", { prompt });
 
-		if (!data.length) {
-			historyList.innerHTML = `<div class="history-empty">No history yet</div>`;
-			return;
+			removeTyping();
+			clearEmptyStateIfNeeded();
+
+			if (!data.questions) {
+				createMessage("I could not generate follow-up questions.", "bot");
+				return;
+			}
+
+			createMessage(
+				`I need a little more detail to improve the prompt:\n\n${data.questions}`,
+				"bot"
+			);
+
+			stage = "waiting_answers";
+		} catch (err) {
+			removeTyping();
+			createMessage(`Error: ${err.message}`, "bot");
+		} finally {
+			setBusy(false);
 		}
-
-		data.forEach((item) => {
-			const div = document.createElement("div");
-			div.classList.add("history-item");
-
-			div.innerText = item.original_prompt.slice(0, 40) + "...";
-
-			div.onclick = () => {
-				createMessage("Previous Prompt:\n" + item.original_prompt, "user");
-				createMessage("Final Version:\n" + item.final_prompt, "bot");
-			};
-
-			historyList.appendChild(div);
-		});
-
-	} catch (err) {
-		console.error("History load failed", err);
 	}
-}
 
-/* =========================
-   INIT
-========================= */
-window.onload = () => {
-	loadHistory();
-};
+	async function submitAnswers(answers) {
+		showTyping();
+
+		try {
+			await apiJson("/submit_answers", { answers });
+			removeTyping();
+
+			createMessage("Generating your optimized prompt...", "bot");
+			await generateFinal();
+		} catch (err) {
+			removeTyping();
+			createMessage(`Error: ${err.message}`, "bot");
+			setBusy(false);
+		}
+	}
+
+	async function generateFinal() {
+		showTyping();
+
+		try {
+			const data = await apiJson("/generate_final", {});
+			removeTyping();
+
+			if (!data.final_prompt) {
+				createMessage("Final prompt generation returned no content.", "bot");
+				return;
+			}
+
+			createMessage(`Here is your optimized prompt:\n\n${data.final_prompt}`, "bot");
+			stage = "initial";
+		} catch (err) {
+			removeTyping();
+			createMessage(`Error: ${err.message}`, "bot");
+		} finally {
+			setBusy(false);
+		}
+	}
+
+	async function handleSend() {
+		if (isBusy) return;
+
+		const text = input.value.trim();
+		if (!text) return;
+
+		clearEmptyStateIfNeeded();
+		createMessage(text, "user");
+
+		input.value = "";
+		autoResizeTextarea();
+
+		setBusy(true);
+
+		if (stage === "initial") {
+			await analyzePrompt(text);
+		} else if (stage === "waiting_answers") {
+			await submitAnswers(text);
+		} else {
+			// fallback, should not usually happen
+			setBusy(false);
+			createMessage("The conversation is resetting. Please send the prompt again.", "bot");
+			stage = "initial";
+		}
+	}
+
+	function loadHistory() {
+		if (!historyList) return;
+
+		fetch("/history")
+			.then((res) => res.json())
+			.then((items) => {
+				historyList.innerHTML = "";
+
+				if (!Array.isArray(items) || items.length === 0) {
+					const empty = document.createElement("div");
+					empty.className = "history-empty";
+					empty.textContent = "No history loaded yet.";
+					historyList.appendChild(empty);
+					return;
+				}
+
+				items.forEach((item) => {
+					const card = document.createElement("div");
+					card.className = "history-item";
+
+					const title = (item.original_prompt || "Untitled prompt")
+						.replace(/\s+/g, " ")
+						.trim();
+
+					card.textContent = title.length > 48 ? title.slice(0, 48) + "…" : title;
+
+					card.addEventListener("click", () => {
+						clearEmptyStateIfNeeded();
+						createMessage(`Previous Prompt:\n${item.original_prompt || ""}`, "user");
+						if (item.final_prompt) {
+							createMessage(`Final Version:\n${item.final_prompt}`, "bot");
+						}
+					});
+
+					historyList.appendChild(card);
+				});
+			})
+			.catch((err) => {
+				console.error("History load failed:", err);
+				historyList.innerHTML = `
+					<div class="history-empty">
+						History could not be loaded.
+					</div>
+				`;
+			});
+	}
+
+	function wireQuickPrompts() {
+		quickPromptButtons.forEach((btn) => {
+			btn.addEventListener("click", () => {
+				const text = btn.textContent.trim();
+				setInputValue(text);
+			});
+		});
+	}
+
+	function initEmptyStateInteractions() {
+		const emptyState = chatContainer.querySelector(".empty-state");
+		if (!emptyState) return;
+
+		emptyState.addEventListener("click", () => {
+			input.focus();
+		});
+	}
+
+	// Events
+	input.addEventListener("input", autoResizeTextarea);
+
+	input.addEventListener("keydown", (e) => {
+		if (e.key === "Enter" && !e.shiftKey) {
+			e.preventDefault();
+			handleSend();
+		}
+	});
+
+	sendBtn.addEventListener("click", handleSend);
+
+	// Small quality-of-life improvement for paste and focus
+	input.addEventListener("paste", () => {
+		requestAnimationFrame(autoResizeTextarea);
+	});
+
+	// Init
+	window.addEventListener("load", () => {
+		autoResizeTextarea();
+		loadHistory();
+		wireQuickPrompts();
+		initEmptyStateInteractions();
+		scrollToBottom(false);
+	});
+
+	// Keep layout stable when viewport changes on mobile
+	window.addEventListener("resize", () => {
+		autoResizeTextarea();
+	});
+
+	// Expose a tiny debug hook if needed in browser console
+	window.CyrusChat = {
+		get stage() {
+			return stage;
+		},
+		reset() {
+			stage = "initial";
+			setBusy(false);
+		},
+	};
+})();
